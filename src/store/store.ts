@@ -39,7 +39,7 @@ export function neueId(): string {
 export function neuesProjekt(beginnIso: string): Projekt {
   const jetzt = new Date().toISOString();
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: neueId(),
     angelegtAm: jetzt,
     geaendertAm: jetzt,

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { aktiveModule, kwp, leereDachflaeche, projektKwp, projektModule, raster } from "./dach";
+import {
+  aktiveModule,
+  kwp,
+  leereDachflaeche,
+  projektKwp,
+  projektModule,
+  raster,
+  slotInfos,
+} from "./dach";
 
 function dach(breite: number, hoehe: number) {
   return { ...leereDachflaeche("d1", "Test"), breite, hoehe };
@@ -44,5 +52,51 @@ describe("Projekt-Summen", () => {
     const p = { dachflaechen: [dach(10, 6), { ...dach(10, 6), deaktiviert: [0] }] };
     expect(projektModule(p)).toBe(47);
     expect(projektKwp(p)).toBeCloseTo(20.68);
+  });
+});
+
+describe("Hindernisse", () => {
+  it("blockieren überlappende Rasterplätze automatisch", () => {
+    const d = {
+      ...dach(10, 6),
+      // Dachfenster mitten im Feld
+      hindernisse: [
+        { id: "h1", name: "Dachfenster", x: 4.5, y: 2.5, breite: 0.78, hoehe: 1.18 },
+      ],
+    };
+    const blockiert = slotInfos(d).slots.filter((s) => s.zustand === "blockiert");
+    expect(blockiert.length).toBeGreaterThan(0);
+    expect(aktiveModule(d)).toBe(24 - blockiert.length);
+  });
+  it("am Rand außerhalb des Felds blockiert nichts", () => {
+    const d = {
+      ...dach(10, 6),
+      hindernisse: [{ id: "h1", name: "Entlüfter", x: 0.01, y: 0.01, breite: 0.1, hoehe: 0.1 }],
+    };
+    expect(aktiveModule(d)).toBe(24);
+  });
+});
+
+describe("Versatz", () => {
+  it("ohne Versatz bleibt alles gültig", () => {
+    expect(aktiveModule({ ...dach(10, 6), versatzX: 0.05 })).toBe(24);
+  });
+  it("zu großer Versatz schiebt eine Spalte aus dem Randbereich", () => {
+    const d = { ...dach(10, 6), versatzX: 0.5 };
+    const blockiert = slotInfos(d).slots.filter((s) => s.zustand === "blockiert");
+    expect(blockiert.length).toBe(3); // rechte Spalte (3 Zeilen) raus
+    expect(aktiveModule(d)).toBe(21);
+  });
+});
+
+describe("Freie Module", () => {
+  it("zählen zur Anlage dazu", () => {
+    const d = {
+      ...dach(10, 6),
+      deaktiviert: [0],
+      freieModule: [{ id: "f1", x: 0.1, y: 0.1 }],
+    };
+    expect(aktiveModule(d)).toBe(24); // 23 im Raster + 1 frei
+    expect(kwp(d)).toBeCloseTo(10.56);
   });
 });

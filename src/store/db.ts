@@ -19,12 +19,29 @@ function db(): Promise<IDBPDatabase<PvDb>> {
   return dbPromise;
 }
 
-/** Migrationskette für spätere Schema-Versionen. */
+/** Migrationskette für ältere Schema-Versionen. */
+type AltesProjekt = Omit<Projekt, "schemaVersion"> & { schemaVersion: number };
+
 export function migriere(p: Projekt): Projekt {
-  if (p.schemaVersion !== AKTUELLE_SCHEMA_VERSION) {
-    throw new Error(`Unbekannte Schema-Version ${String(p.schemaVersion)}`);
+  let x: AltesProjekt = p;
+  if (x.schemaVersion === 1) {
+    // Version 2: Versatz, Hindernisse und freie Module je Dachfläche
+    x = {
+      ...x,
+      schemaVersion: 2,
+      dachflaechen: x.dachflaechen.map((d) => ({
+        ...d,
+        versatzX: d.versatzX ?? 0,
+        versatzY: d.versatzY ?? 0,
+        hindernisse: d.hindernisse ?? [],
+        freieModule: d.freieModule ?? [],
+      })),
+    };
   }
-  return p;
+  if (x.schemaVersion !== AKTUELLE_SCHEMA_VERSION) {
+    throw new Error(`Unbekannte Schema-Version ${String(x.schemaVersion)}`);
+  }
+  return x as Projekt;
 }
 
 export async function alleProjekte(): Promise<Projekt[]> {

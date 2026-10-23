@@ -11,7 +11,13 @@ import {
   eingabeKlasse,
 } from "../ui/bausteine";
 import DachPlaner from "../ui/DachPlaner";
-import { leereDachflaeche, projektKwp, projektModule } from "../logic/dach";
+import {
+  HINDERNIS_VORLAGEN,
+  leereDachflaeche,
+  neuesHindernis,
+  projektKwp,
+  projektModule,
+} from "../logic/dach";
 import { formatZahl } from "../logic/zahlen";
 
 export default function ProjektPage(props: { id: string }) {
@@ -101,7 +107,7 @@ export default function ProjektPage(props: { id: string }) {
           />
         </Feld>
         <div className="grid grid-cols-2 gap-3">
-          <Feld label="Beginn">
+          <Feld label="Beginn" hinweis="Leer = noch ohne Termin (nicht im Kalender)">
             <TextEingabe
               typ="date"
               wert={p.beginn}
@@ -250,7 +256,175 @@ export default function ProjektPage(props: { id: string }) {
                     : [...d.deaktiviert, index],
                 })
               }
+              aufBewegt={(typ, id, x, y) =>
+                typ === "hindernis"
+                  ? setzeDach(d.id, {
+                      hindernisse: d.hindernisse.map((h) =>
+                        h.id === id ? { ...h, x, y } : h,
+                      ),
+                    })
+                  : setzeDach(d.id, {
+                      freieModule: d.freieModule.map((f) =>
+                        f.id === id ? { ...f, x, y } : f,
+                      ),
+                    })
+              }
+              aufLoeschen={(typ, id) =>
+                typ === "hindernis"
+                  ? setzeDach(d.id, {
+                      hindernisse: d.hindernisse.filter((h) => h.id !== id),
+                    })
+                  : setzeDach(d.id, {
+                      freieModule: d.freieModule.filter((f) => f.id !== id),
+                    })
+              }
             />
+
+            {/* Anlage verschieben (5-cm-Schritte) */}
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-grund p-2">
+              <span className="text-[13px] font-semibold text-dezent">
+                Anlage verschieben
+                {d.versatzX !== 0 || d.versatzY !== 0 ? (
+                  <span className="block text-[12px] font-normal">
+                    Versatz {formatZahl(d.versatzX * 100, 0)} cm /{" "}
+                    {formatZahl(d.versatzY * 100, 0)} cm
+                  </span>
+                ) : null}
+              </span>
+              <div className="flex gap-1">
+                {(
+                  [
+                    ["◀", -0.05, 0],
+                    ["▲", 0, -0.05],
+                    ["▼", 0, 0.05],
+                    ["▶", 0.05, 0],
+                  ] as const
+                ).map(([txt, dx, dy]) => (
+                  <button
+                    key={txt}
+                    type="button"
+                    aria-label={`Anlage ${txt} verschieben`}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border-2 border-linie bg-flaeche text-[16px] font-bold active:border-akzent"
+                    onClick={() =>
+                      setzeDach(d.id, {
+                        versatzX: Math.round((d.versatzX + dx) * 100) / 100,
+                        versatzY: Math.round((d.versatzY + dy) * 100) / 100,
+                      })
+                    }
+                  >
+                    {txt}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="min-h-11 rounded-lg border-2 border-linie bg-flaeche px-2 text-[13px] font-bold text-dezent active:border-akzent"
+                  onClick={() => setzeDach(d.id, { versatzX: 0, versatzY: 0 })}
+                >
+                  Mitte
+                </button>
+              </div>
+            </div>
+
+            {/* Hindernisse und freie Module hinzufügen */}
+            <div className="flex flex-wrap gap-2">
+              {HINDERNIS_VORLAGEN.map((v) => (
+                <button
+                  key={v.name}
+                  type="button"
+                  className="min-h-11 flex-1 rounded-lg border-2 border-linie bg-flaeche px-2 text-[13px] font-bold active:border-akzent"
+                  onClick={() =>
+                    setzeDach(d.id, {
+                      hindernisse: [
+                        ...d.hindernisse,
+                        neuesHindernis(neueId(), v, d),
+                      ],
+                    })
+                  }
+                >
+                  + {v.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="min-h-11 flex-1 rounded-lg border-2 border-sonne bg-sonne-hell px-2 text-[13px] font-bold text-sonne"
+                onClick={() =>
+                  setzeDach(d.id, {
+                    freieModule: [
+                      ...d.freieModule,
+                      {
+                        id: neueId(),
+                        x: Math.max(0, (d.breite ?? 2) / 2),
+                        y: Math.max(0, (d.hoehe ?? 2) / 2),
+                      },
+                    ],
+                  })
+                }
+              >
+                + Freies Modul
+              </button>
+            </div>
+            {d.hindernisse.length > 0 ? (
+              <p className="text-[13px] text-dezent">
+                Hindernisse und freie Module in der Dachansicht einfach mit dem
+                Finger an die richtige Stelle ziehen. Antippen zeigt den
+                Löschen-Knopf; Maße lassen sich unten anpassen.
+              </p>
+            ) : null}
+
+            {/* Hindernis-Maße */}
+            {d.hindernisse.map((h) => (
+              <div key={h.id} className="grid grid-cols-5 items-end gap-1 rounded-lg bg-grund p-2">
+                <input
+                  className={eingabeKlasse.replace("w-full", "col-span-5 w-full") + " px-2 py-1.5 text-[14px] min-h-10 mb-1"}
+                  value={h.name}
+                  onChange={(e) =>
+                    setzeDach(d.id, {
+                      hindernisse: d.hindernisse.map((y) =>
+                        y.id === h.id ? { ...y, name: e.target.value } : y,
+                      ),
+                    })
+                  }
+                />
+                {(
+                  [
+                    ["x", h.x, "↔ Lage"],
+                    ["y", h.y, "↕ Lage"],
+                    ["breite", h.breite, "Breite"],
+                    ["hoehe", h.hoehe, "Höhe"],
+                  ] as const
+                ).map(([feld, wert, label]) => (
+                  <label key={feld} className="block">
+                    <span className="block text-[11px] font-semibold uppercase text-dezent">
+                      {label}
+                    </span>
+                    <ZahlEingabe
+                      klein
+                      wert={wert}
+                      suffix="m"
+                      aufAenderung={(n) =>
+                        setzeDach(d.id, {
+                          hindernisse: d.hindernisse.map((y) =>
+                            y.id === h.id ? { ...y, [feld]: n ?? 0 } : y,
+                          ),
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  aria-label={`${h.name} löschen`}
+                  className="min-h-11 rounded-lg border-2 border-linie text-[16px] font-bold text-fehler"
+                  onClick={() =>
+                    setzeDach(d.id, {
+                      hindernisse: d.hindernisse.filter((y) => y.id !== h.id),
+                    })
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
 
             <button
               type="button"

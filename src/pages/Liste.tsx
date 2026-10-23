@@ -4,7 +4,7 @@ import { STATUS_TEXT } from "../model/types";
 import { erstelleProjekt, useAppZustand } from "../store/store";
 import { geheZu } from "../ui/router";
 import { GrosserKnopf, StatusChip, eingabeKlasse } from "../ui/bausteine";
-import { formatZeitraum, heuteIso } from "../logic/kalender";
+import { formatZeitraum } from "../logic/kalender";
 import { projektKwp, projektModule } from "../logic/dach";
 import { formatZahl } from "../logic/zahlen";
 
@@ -21,14 +21,18 @@ export default function Liste() {
   const { projekte } = useAppZustand();
   const [suche, setSuche] = useState("");
   const [sortierung, setSortierung] = useState<Sortierung>("neueste");
-  const [statusFilter, setStatusFilter] = useState<ProjektStatus | "alle">(
-    "alle",
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    ProjektStatus | "alle" | "ohne_termin"
+  >("alle");
 
   const s = suche.trim().toLowerCase();
   let gefiltert = projekte.filter(
     (p) =>
-      (statusFilter === "alle" || p.status === statusFilter) &&
+      (statusFilter === "alle"
+        ? true
+        : statusFilter === "ohne_termin"
+          ? !p.beginn
+          : p.status === statusFilter) &&
       (!s ||
         p.name.toLowerCase().includes(s) ||
         p.kunde.toLowerCase().includes(s) ||
@@ -54,13 +58,18 @@ export default function Liste() {
       <GrosserKnopf
         volleBreite
         aufKlick={() => {
-          void erstelleProjekt(heuteIso()).then((p) =>
+          void erstelleProjekt("").then((p) =>
             geheZu({ name: "projekt", id: p.id }),
           );
         }}
       >
-        + Neues PV-Projekt
+        + Neues PV-Projekt (erst mal ohne Termin)
       </GrosserKnopf>
+      <p className="-mt-1 text-[13px] text-dezent">
+        Vorplanen ohne Datum: Das Projekt erscheint nur hier in der Liste.
+        Sobald du auf der Projekt-Seite einen Beginn setzt, taucht es auch im
+        Kalender auf.
+      </p>
 
       <input
         type="search"
@@ -84,21 +93,27 @@ export default function Liste() {
       </select>
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-        {(["alle", "geplant", "laufend", "abgeschlossen"] as const).map((f) => (
-          <button
-            key={f}
-            type="button"
-            className={
-              "min-h-11 flex-none rounded-full border-2 px-4 text-[14px] font-bold " +
-              (statusFilter === f
-                ? "border-akzent bg-akzent-hell text-akzent"
-                : "border-linie bg-flaeche text-dezent")
-            }
-            onClick={() => setStatusFilter(f)}
-          >
-            {f === "alle" ? "Alle" : STATUS_TEXT[f]}
-          </button>
-        ))}
+        {(["alle", "ohne_termin", "geplant", "laufend", "abgeschlossen"] as const).map(
+          (f) => (
+            <button
+              key={f}
+              type="button"
+              className={
+                "min-h-11 flex-none rounded-full border-2 px-4 text-[14px] font-bold " +
+                (statusFilter === f
+                  ? "border-akzent bg-akzent-hell text-akzent"
+                  : "border-linie bg-flaeche text-dezent")
+              }
+              onClick={() => setStatusFilter(f)}
+            >
+              {f === "alle"
+                ? "Alle"
+                : f === "ohne_termin"
+                  ? "Ohne Termin"
+                  : STATUS_TEXT[f]}
+            </button>
+          ),
+        )}
       </div>
 
       {gefiltert.length === 0 ? (
