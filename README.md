@@ -7,7 +7,7 @@ Material-Checkliste abhaken. Alle Daten bleiben im Gerätespeicher.
 
 ## Am Handy nutzen
 
-1. `https://fastsniperassasin-wq.github.io/pv-planung/` in Chrome öffnen
+1. `https://fastsniperassasin-wq.github.io/PV-Manager-/` in Chrome öffnen
 2. Menü ⋮ → „App installieren“
 
 ## Entwicklung
