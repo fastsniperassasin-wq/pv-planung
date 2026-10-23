@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { ladeAlles } from "./store/store";
+import {
+  ladeAlles,
+  sofortAutoSicherung,
+  useAppZustand,
+  verschiebeSicherungsBanner,
+} from "./store/store";
 import { geheZu, useRoute } from "./ui/router";
 import Kalender from "./pages/Kalender";
 import Liste from "./pages/Liste";
@@ -15,10 +20,32 @@ const MENUE = [
 export default function App() {
   const route = useRoute();
   const [menueOffen, setMenueOffen] = useState(false);
+  const { projekte, letzteExterneSicherung, sicherungsBannerVerschobenAm } =
+    useAppZustand();
 
   useEffect(() => {
     void ladeAlles();
+    // Beim Verlassen/Minimieren der App sofort eine automatische Kopie schreiben
+    const aufSichtbarkeit = () => {
+      if (document.visibilityState === "hidden") void sofortAutoSicherung();
+    };
+    document.addEventListener("visibilitychange", aufSichtbarkeit);
+    return () =>
+      document.removeEventListener("visibilitychange", aufSichtbarkeit);
   }, []);
+
+  // Erinnerung an die externe Sicherung (alle 7 Tage, höchstens 1× am Tag)
+  const heute = new Date().toISOString().slice(0, 10);
+  const tageSeitSicherung = letzteExterneSicherung
+    ? Math.floor(
+        (Date.now() - new Date(letzteExterneSicherung).getTime()) / 86400000,
+      )
+    : null;
+  const zeigeSicherungsBanner =
+    projekte.length > 0 &&
+    (tageSeitSicherung === null || tageSeitSicherung >= 7) &&
+    sicherungsBannerVerschobenAm !== heute &&
+    route.name !== "sicherung";
 
   const titel =
     route.name === "liste"
@@ -56,6 +83,33 @@ export default function App() {
           </button>
         ) : null}
       </header>
+
+      {zeigeSicherungsBanner ? (
+        <div className="mb-3 rounded-xl border-2 border-sonne bg-sonne-hell p-3">
+          <div className="mb-2 text-[15px] font-semibold">
+            💾{" "}
+            {tageSeitSicherung === null
+              ? "Deine Projekte wurden noch nie extern gesichert."
+              : `Letzte externe Sicherung vor ${tageSeitSicherung} Tagen.`}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="min-h-11 flex-1 rounded-lg bg-sonne text-[14px] font-bold text-white"
+              onClick={() => geheZu({ name: "sicherung" })}
+            >
+              Jetzt sichern
+            </button>
+            <button
+              type="button"
+              className="min-h-11 rounded-lg border-2 border-linie bg-flaeche px-3 text-[14px] font-bold text-dezent"
+              onClick={() => void verschiebeSicherungsBanner()}
+            >
+              Morgen erinnern
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {menueOffen ? (
         <div

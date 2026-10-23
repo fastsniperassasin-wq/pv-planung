@@ -4,15 +4,32 @@ import { AKTUELLE_SCHEMA_VERSION } from "../model/types";
 
 interface PvDb extends DBSchema {
   projekte: { key: string; value: Projekt };
+  autosicherungen: { key: number; value: AutoSicherung };
+  meta: { key: string; value: string };
 }
+
+/** Automatische, rotierende Sicherungskopie (nur auf diesem Gerät). */
+export interface AutoSicherung {
+  id: number; // Zeitstempel
+  erstelltAm: string; // ISO
+  projekte: Projekt[];
+}
+
+const MAX_AUTOSICHERUNGEN = 5;
 
 let dbPromise: Promise<IDBPDatabase<PvDb>> | null = null;
 
 function db(): Promise<IDBPDatabase<PvDb>> {
-  dbPromise ??= openDB<PvDb>("pv-planung-app", 1, {
+  dbPromise ??= openDB<PvDb>("pv-planung-app", 2, {
     upgrade(d) {
       if (!d.objectStoreNames.contains("projekte")) {
         d.createObjectStore("projekte", { keyPath: "id" });
+      }
+      if (!d.objectStoreNames.contains("autosicherungen")) {
+        d.createObjectStore("autosicherungen", { keyPath: "id" });
+      }
+      if (!d.objectStoreNames.contains("meta")) {
+        d.createObjectStore("meta");
       }
     },
   });
@@ -63,4 +80,44 @@ export async function ersetzeAlles(projekte: Projekt[]): Promise<void> {
   await tx.objectStore("projekte").clear();
   for (const p of projekte) await tx.objectStore("projekte").put(p);
   await tx.done;
+}
+
+/* ---------- Automatische Sicherungskopien (rotierend) ---------- */
+
+export async function schreibeAutoSicherung(projekte: Projekt[]): Promise<void> {
+  const d = await db();
+  const jetzt = Date.now();
+  await d.put("autosicherungen", {
+    id: jetzt,
+    erstelltAm: new Date(jetzt).toISOString(),
+    projekte,
+  });
+  // Nur die neuesten behalten – keine Dateiflut
+  const keys = (await d.getAllKeys("autosicherungen")).sort((a, b) => b - a);
+  for (const alt of keys.slice(MAX_AUTOSICHERUNGEN)) {
+    await d.delete("autosicherungen", alt);
+  }
+}
+
+export async function listeAutoSicherungen(): Promise<
+  { id: number; erstelltAm: string; anzahl: number }[]
+> {
+  const alle = await (await db()).getAll("autosicherungen");
+  return alle
+    .sort((a, b) => b.id - a.id)
+    .map((s) => ({ id: s.id, erstelltAm: s.erstelltAm, anzahl: s.projekte.length }));
+}
+
+export async function ladeAutoSicherung(id: number): Promise<AutoSicherung | undefined> {
+  return (await db()).get("autosicherungen", id);
+}
+
+/* ---------- Kleine Merkwerte (z. B. letzte externe Sicherung) ---------- */
+
+export async function leseMeta(key: string): Promise<string | undefined> {
+  return (await db()).get("meta", key);
+}
+
+export async function schreibeMeta(key: string, wert: string): Promise<void> {
+  await (await db()).put("meta", wert, key);
 }

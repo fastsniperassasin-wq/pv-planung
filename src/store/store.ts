@@ -7,6 +7,8 @@ import * as db from "./db";
 export interface AppZustand {
   geladen: boolean;
   projekte: Projekt[];
+  letzteExterneSicherung?: string; // ISO
+  sicherungsBannerVerschobenAm?: string; // ISO-Datum
 }
 
 let zustand: AppZustand = { geladen: false, projekte: [] };
@@ -26,7 +28,62 @@ export function useAppZustand(): AppZustand {
 }
 
 export async function ladeAlles(): Promise<void> {
-  zustand = { geladen: true, projekte: await db.alleProjekte() };
+  const [projekte, letzteExterneSicherung, bannerVerschoben] =
+    await Promise.all([
+      db.alleProjekte(),
+      db.leseMeta("letzteExterneSicherung"),
+      db.leseMeta("sicherungsBannerVerschobenAm"),
+    ]);
+  zustand = {
+    geladen: true,
+    projekte,
+    letzteExterneSicherung,
+    sicherungsBannerVerschobenAm: bannerVerschoben,
+  };
+  melde();
+}
+
+/* ---------- Automatische Sicherungskopie (rotierend, im Gerät) ---------- */
+
+let autoTimer: ReturnType<typeof setTimeout> | null = null;
+let letzterAbdruck = "";
+
+function abdruck(projekte: Projekt[]): string {
+  return (
+    projekte.length +
+    "|" +
+    projekte.map((p) => p.geaendertAm).sort().join(",")
+  );
+}
+
+function planeAutoSicherung(): void {
+  if (autoTimer) clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => {
+    autoTimer = null;
+    void sofortAutoSicherung();
+  }, 3000);
+}
+
+/** Schreibt sofort eine Kopie, wenn sich seit der letzten etwas geändert hat. */
+export async function sofortAutoSicherung(): Promise<void> {
+  if (!zustand.geladen || zustand.projekte.length === 0) return;
+  const jetzt = abdruck(zustand.projekte);
+  if (jetzt === letzterAbdruck) return;
+  letzterAbdruck = jetzt;
+  await db.schreibeAutoSicherung(zustand.projekte);
+}
+
+export async function merkeExterneSicherung(): Promise<void> {
+  const iso = new Date().toISOString();
+  await db.schreibeMeta("letzteExterneSicherung", iso);
+  zustand = { ...zustand, letzteExterneSicherung: iso };
+  melde();
+}
+
+export async function verschiebeSicherungsBanner(): Promise<void> {
+  const heute = new Date().toISOString().slice(0, 10);
+  await db.schreibeMeta("sicherungsBannerVerschobenAm", heute);
+  zustand = { ...zustand, sicherungsBannerVerschobenAm: heute };
   melde();
 }
 
@@ -82,6 +139,7 @@ export async function erstelleProjekt(beginnIso: string): Promise<Projekt> {
   await db.speichereProjekt(p);
   zustand = { ...zustand, projekte: [p, ...zustand.projekte] };
   melde();
+  planeAutoSicherung();
   return p;
 }
 
@@ -103,9 +161,12 @@ export function aenderProjekt(
   };
   melde();
   autosave(neu);
+  planeAutoSicherung();
 }
 
 export async function loescheProjekt(id: string): Promise<void> {
+  // Vor dem Löschen eine Kopie des aktuellen Stands festhalten
+  await sofortAutoSicherung();
   await db.loescheProjekt(id);
   zustand = {
     ...zustand,

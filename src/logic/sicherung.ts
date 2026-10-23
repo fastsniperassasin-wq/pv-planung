@@ -1,5 +1,6 @@
 import type { Projekt } from "../model/types";
 import * as db from "../store/db";
+import { merkeExterneSicherung } from "../store/store";
 
 interface SicherungsDatei {
   formatVersion: 1;
@@ -21,6 +22,7 @@ export async function datenExportieren(): Promise<void> {
   if (navigator.canShare?.({ files: [datei] })) {
     try {
       await navigator.share({ files: [datei], title: name });
+      await merkeExterneSicherung();
       return;
     } catch (e) {
       if ((e as DOMException).name === "AbortError") return;
@@ -34,6 +36,7 @@ export async function datenExportieren(): Promise<void> {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+  await merkeExterneSicherung();
 }
 
 export async function datenImportieren(datei: File): Promise<void> {
