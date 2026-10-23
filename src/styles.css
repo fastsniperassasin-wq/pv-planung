@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --color-grund: #f1f4f8;
+  --color-flaeche: #ffffff;
+  --color-tinte: #1c2433;
+  --color-dezent: #68717f;
+  --color-linie: #d5dae2;
+  --color-akzent: #1f5aa8;
+  --color-akzent-hell: #e7eef8;
+  --color-sonne: #d97706;
+  --color-sonne-hell: #fbeeda;
+  --color-modul: #16365c;
+  --color-geplant: #4a7ab5;
+  --color-geplant-hell: #e8f0f9;
+  --color-fertig: #2e7d4f;
+  --color-fertig-hell: #e4f2e9;
+  --color-fehler: #a11f2e;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-grund text-tinte;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Baustellen-Bedienung: große Ziele, kräftige Kontraste */
+button, a, input, select, textarea {
+  touch-action: manipulation;
+}

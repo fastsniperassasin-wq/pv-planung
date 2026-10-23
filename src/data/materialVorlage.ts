@@ -1,0 +1,21 @@
+/** Standard-Materialliste für eine PV-Montage (Dachdecker-Praxis). */
+export const MATERIAL_VORLAGE: string[] = [
+  "PV-Module",
+  "Wechselrichter",
+  "Batteriespeicher",
+  "Dachhaken",
+  "Montageschienen",
+  "Schienenverbinder",
+  "Mittelklemmen",
+  "Endklemmen",
+  "Solarkabel DC 6 mm²",
+  "MC4-Steckverbinder",
+  "Dachdurchführung / Kabeldurchgang",
+  "Kabelkanal / Wellrohr",
+  "Potentialausgleich / Erdungsset",
+  "Überspannungsschutz",
+  "AC-Anschlussmaterial",
+  "Energiezähler / Smart Meter",
+  "Warnaufkleber / Beschriftung",
+  "Gerüst / Absturzsicherung",
+];
